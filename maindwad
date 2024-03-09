@@ -1,0 +1,60 @@
+import discord
+from discord.ext import commands
+import json
+from datetime import datetime, timedelta
+
+intents = discord.Intents.default()
+client = commands.Bot(command_prefix='.', intents=intents)
+
+def load_items():
+    try:
+        with open("items.json", "r") as file:
+            return json.load(file)
+    except FileNotFoundError:
+        return {}
+
+def save_items(data):
+    with open("items.json", "w") as file:
+        json.dump(data, file)
+
+@client.command(name='additem')
+async def add_item(ctx, item_name: str, dissolve_time: int):
+    try:
+        items = load_items()
+
+        if item_name not in items:
+            items[item_name] = {"dissolve_time": dissolve_time,"added_time": datetime.utcnow()}
+            save_items(items)
+            if dissolve_time >= 365:
+                await ctx.send(f'Item "{item_name}" added. It takes {dissolve_time/365} years to dissolve.')
+            else:
+                await ctx.send(f'Item "{item_name}" added. It takes {dissolve_time} days to dissolve.')
+        else:
+            await ctx.send(f'Item "{item_name}" already exists in the database.')
+
+    except ValueError:
+        await ctx.send('Invalid input. Make sure to provide a valid item name and dissolve time.')
+
+@client.command(name='checktime')
+async def check_time(ctx, item_name: str):
+    items = load_items()
+
+    if item_name in items:
+        added_time = datetime.fromisoformat(items[item_name]["added_time"])
+        dissolve_time = items[item_name]["dissolve_time"]
+
+        time_passed = datetime.utcnow() - added_time
+        time_remaining = timedelta(hours=dissolve_time) - time_passed
+
+        if time_remaining.total_seconds() > 0:
+            await ctx.send(f'Time remaining for "{item_name}" to dissolve: {time_remaining}.')
+        else:
+            await ctx.send(f'Item "{item_name}" has dissolved!')
+            items[item_name]["times_dissolved"] += 1
+            await ctx.send(f'Item {item_name} has dissolved {items[item_name]["times_dissolved"]} times.')
+            save_items(items)
+
+    else:
+        await ctx.send(f'Item "{item_name}" does not exist in the database.')
+
+client.run("TAJNY BOT TOKEN")
